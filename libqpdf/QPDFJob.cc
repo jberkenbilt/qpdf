@@ -1970,7 +1970,7 @@ QPDFJob::doProcess(
     // a password encoded in PDF Doc encoding or Windows code page
     // 1252 for an AES-encrypted file or a UTF-8-encoded password on
     // an RC4-encrypted file, or if the password was properly encoded
-    // by the password given here was incorrectly encoded, there's a
+    // but the password given here was incorrectly encoded, there's a
     // good chance we'd succeed here.
 
     std::string ptemp;
