@@ -2753,7 +2753,7 @@ QPDFJob::handlePageSpecs(
             // survives through copying to the output but gets cleaned up
             // automatically at the end. Do not canonicalize the file
             // name. Using two different paths to refer to the same
-            // file is a document workaround for duplicating a page.
+            // file is a documented workaround for duplicating a page.
             // If you are using this an example of how to do this with
             // the API, you can just create two different QPDF objects
             // to the same underlying file with the same path to
