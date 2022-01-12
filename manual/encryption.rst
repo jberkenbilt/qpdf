@@ -47,24 +47,24 @@ Password Protection
   Password protection is distinct from encryption. This point is often
   misunderstood. A PDF file can be encrypted without being
   password-protected. The intent of PDF encryption was that there
-  would be two passwords: a *user password* and an *owner password*.
+  would be two passwords: an *user password* and an *owner password*.
   Either password can be used to retrieve the encryption key. A
   conforming reader is supposed to obey the security restrictions
   if the file is opened using the user password but not if the file is
   opened with the owner password. :command:`qpdf` makes no distinction
   between which password is used to open the file. The distinction
-  made by conforming readers between the user and owner password is
+  made by conforming readers between user and owner passwords is
   what makes it common to create encrypted files with no password
   protection. This is done by using the empty string as the user
   password and some secret string as the owner password. When a user
   opens the PDF file, the empty string is used to retrieve the
   encryption key, making the file usable, but a conforming reader
-  restricts certain operations from the user.
+  restricts certain operations for the user.
 
 What does all this mean? Here are a few things to realize.
 
 - Since the user password and the owner password are both used to
-  recover the encryption key, but the encryption key is the same,
+  recover the same encryption key,
   there is *fundamentally no way* to prevent an application from
   disregarding the security restrictions on a file. Any software that
   can read the encrypted file at all has the encryption key.
@@ -76,19 +76,19 @@ What does all this mean? Here are a few things to realize.
   don't know how to circumvent them.
 
 - If a file is password-protected, you have to know at least one of
-  the user or owner password to retrieve the encryption key. However,
+  the user or owner passwords to retrieve the encryption key. However,
   in the case of 40-bit encryption, the actual encryption key is only
   5 bytes long and can be easily brute-forced. As such, files
   encrypted with 40-bit encryption are not secure regardless of how
   strong the password is. With 128-bit encryption, the default
-  security handler uses RC4 encryption, which is also known not be
-  secure. As such, the only way to securely encrypt a PDF file using
+  security handler uses RC4 encryption, which is also known to be
+  insecure. As such, the only way to securely encrypt a PDF file using
   the standard security handler (as of the last review of this chapter
   in 2022) is to use AES encryption. This is the only supported
   algorithm with 256-bit encryption, and it can be selected to be used
   with 128-bit encryption as well. However there is no reason to use
   128-bit encryption with AES. If you are going to use AES, just use
-  256-bit encryption instead. The security of a 256-bit, AES-encrypted
+  256-bit encryption instead. The security of a 256-bit AES-encrypted
   PDF file with a strong password is comparable to using a
   general-purpose encryption tool like :command:`gpg` or
   :command:`openssl` to encrypt the PDF file with the same password,
@@ -118,6 +118,8 @@ Algorithm parameters ``V`` and ``R``
 
   - 2: An extension of the original algorithm allowing longer keys.
     Introduced in PDF 1.4.
+
+  - 3: Not permitted in a conforming PDF file.
 
   - 4: An extension of the algorithm that allows it to be
     parameterized by additional rules for handling strings and
@@ -155,7 +157,7 @@ Encryption Dictionary
   - ``V`` and ``R`` as described above
 
   - ``O``, ``U``, ``OE``, ``UE``: values used by the algorithms that
-    recover the encryption key from the user and owner password. Which
+    recover the encryption key from user and owner passwords. Which
     of these are defined and how they are used vary based on the value
     of ``R``.
 
@@ -177,7 +179,7 @@ PDF Security Restrictions
 PDF security restrictions are described by a bit field whose value is
 stored in the ``P`` field in the encryption dictionary. The value of
 ``P`` is used by the algorithms to recover the encryption key given
-the password, which means the value of ``P`` tamper-resistent.
+the password, which makes the value of ``P`` tamper-resistent.
 
 ``P`` is a 32-bit integer, treated as a signed twos-complement number.
 A 1 in any bit position means the permission is granted. The PDF
@@ -194,7 +196,7 @@ files have been seen in the wild.)
 
 Here are the meanings of the bit positions. All bits not listed must
 have the value 1 except bits 1 and 2, which must have the
-value 0. However, the values of bits other than ones in the table
+value 0. However, the values of bits other than those in the table
 are ignored, so having incorrect values probably doesn't break
 anything in most cases. A value of 1 indicates that the permission
 is granted.

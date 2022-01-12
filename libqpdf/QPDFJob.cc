@@ -710,7 +710,7 @@ QPDFJob::doCheck(QPDF& pdf)
             cout << "File is not linearized\n";
         }
 
-        // Write the file no nowhere, uncompressing
+        // Write the file to nowhere, uncompressing
         // streams.  This causes full file traversal and
         // decoding of all streams we can decode.
         QPDFWriter w(pdf);
