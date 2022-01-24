@@ -1332,7 +1332,7 @@ Related Options
 
    Please see :ref:`page-selection` for additional details.
 
-.. qpdf:option:: --split-pages=[n]
+.. qpdf:option:: --split-pages[=n]
 
    .. help: write pages to separate files
 
@@ -1529,7 +1529,7 @@ Related Options
    - ``qpdf in.pdf out.pdf --rotate=+180``: rotate all pages by 180
      degrees
 
-   - ``qpdf in.pdf out.pdf --rotate=0``: force each page to displayed
+   - ``qpdf in.pdf out.pdf --rotate=0``: force each page to be displayed
      in its natural orientation, which would undo the effect of any
      rotations previously applied in page metadata.
 
@@ -1886,7 +1886,7 @@ Related Options
       encryption.
 
    Enable/disable extraction of text for accessibility to visually
-   impaired. The qpdf library disregards this field when AES is used
+   impaired users. The qpdf library disregards this field when AES is used
    with 128-bit encryption or when 256-bit encryption is used. You
    should never disable accessibility unless you are explicitly doing
    so for creating test files. The PDF spec says that conforming
@@ -2044,7 +2044,7 @@ Related Options
       full: allow full printing (the default)
 
    Control what kind of printing is allowed. For 40-bit encryption,
-   :samp:`{print-opt}` may be ``y`` or ``n`` and enable or disable all
+   :samp:`{print-opt}` may only be ``y`` or ``n`` and enables or disables all
    printing. For 128-bit and 256-bit encryption, :samp:`{print-opt}`
    may have the following values:
 
@@ -2155,7 +2155,7 @@ Page Selection
    filename [ --password=password ] [ page-range ]
 
    Document-level information, such as outlines, tags, etc., is taken
-   from in.pdf is preserved in out.pdf. You can use --empty in place
+   from in.pdf and is preserved in out.pdf. You can use --empty in place
    of an input file to start from an empty file and just copy pages
    equally from all files. You can use "." as a shorthand for the
    primary input file (if not --empty). In the above example, "."
