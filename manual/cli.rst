@@ -2592,9 +2592,8 @@ Related Options
    attachment from the embedded files table but also clears out the
    file specification to ensure that the attachment is actually not
    present in the output file. That means that any potential internal
-   links to the attachment will be broken. This option may be
-   specified multiple times. Run with :qpdf:ref:`--verbose` to see
-   status of the removal. Use :qpdf:ref:`--list-attachments` to find
+   links to the attachment will be broken. Run with :qpdf:ref:`--verbose` to
+   see status of the removal. Use :qpdf:ref:`--list-attachments` to find
    the attachment key. This option may be repeated to remove multiple
    attachments.
 
@@ -2902,7 +2901,7 @@ Related Options
       PDF file. It merely checks that the PDF file is syntactically
       valid. See also qpdf --help=exit-status.
 
-   Check the file's structure and well as encryption, linearization,
+   Check the file's structure as well as encryption, linearization,
    and encoding of stream data, and write information about the file
    to standard output. An exit status of ``0`` indicates syntactic
    correctness of the PDF file. Note that :samp:`--check` writes
@@ -3258,12 +3257,12 @@ At the library API level, all methods that perform encryption and
 decryption interpret passwords as strings of bytes. It is up to the
 caller to ensure that they are appropriately encoded. Starting with qpdf
 version 8.4.0, qpdf will attempt to make this easier for you when
-interact with qpdf via its command line interface. The PDF specification
+interacting with qpdf via its command line interface. The PDF specification
 requires passwords used to encrypt files with 40-bit or 128-bit
 encryption to be encoded with PDF Doc encoding. This encoding is a
 single-byte encoding that supports ISO-Latin-1 and a handful of other
 commonly used characters. It has a large overlap with Windows ANSI but
-is not exactly the same. There is generally not a way to provide PDF Doc
+is not exactly the same. There is generally no way to provide PDF Doc
 encoded strings on the command line. As such, qpdf versions prior to
 8.4.0 would often create PDF files that couldn't be opened with other
 software when given a password with non-ASCII characters to encrypt a
@@ -3348,7 +3347,7 @@ strings of bytes.
 
 Please note that the :qpdf:ref:`--password-is-hex-key` option is
 unrelated to all this. That flag bypasses the normal process of going
-from password to encryption string entirely, allowing the raw
+from password to encryption key entirely, allowing the raw
 encryption key to be specified directly. That behavior is useful for
 forensic purposes or for brute-force recovery of files with unknown
 passwords and has nothing to do with the document's actual passwords.
