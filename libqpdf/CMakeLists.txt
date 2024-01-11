@@ -58,6 +58,7 @@ set(libqpdf_SOURCES
   QPDFAcroFormDocumentHelper.cc
   QPDFAnnotationObjectHelper.cc
   QPDFArgParser.cc
+  QPDFAssembler.cc
   QPDFCryptoProvider.cc
   QPDFDocumentHelper.cc
   QPDFEFStreamObjectHelper.cc
@@ -83,6 +84,7 @@ set(libqpdf_SOURCES
   QPDFPageLabelDocumentHelper.cc
   QPDFPageObjectHelper.cc
   QPDFParser.cc
+  QPDFSplitter.cc
   QPDFStreamFilter.cc
   QPDFSystemError.cc
   QPDFTokenizer.cc
