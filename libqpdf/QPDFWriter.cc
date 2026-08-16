@@ -2433,7 +2433,25 @@ impl::Writer::write()
 
     // Set up progress reporting. For linearized files, we write two passes. events_expected is an
     // approximation, but it's good enough for progress reporting, which is mostly a guess anyway.
-    events_expected = QIntC::to_int(qpdf.getObjectCount() * (cfg.linearize() ? 2 : 1));
+    // PATCH: vanilla qpdf used getObjectCount() here, but objects packed inside object streams
+    // (IC) never trigger a per-object indicateProgress increment — they're written bundled inside
+    // their container's stream body in writeObjectStream's inner pass 2. Their containers (CO)
+    // also early-return out of writeObject without an increment. So events_seen structurally only
+    // ever reaches 2 * (N - CO - IC) for linearized writes (and N - CO - IC for standard). On
+    // object-stream-heavy PDFs (tagged-PDF documents typical of Microsoft Word-365 PDF exports)
+    // roughly 40% of objects can live in object streams, which made the progress bar cap at ~58%
+    // before the finished=true call jumped it to 100%. Counting only writable objects keeps the
+    // ratio close to 1 across file types.
+    size_t in_stream_objs = 0;
+    for (auto const& kv: object_stream_to_objects) {
+        in_stream_objs += kv.second.size();
+    }
+    int writable_objects = QIntC::to_int(qpdf.getObjectCount()) -
+        QIntC::to_int(object_stream_to_objects.size()) - QIntC::to_int(in_stream_objs);
+    if (writable_objects < 1) {
+        writable_objects = 1; // guard against degenerate files; avoids divide-by-zero downstream
+    }
+    events_expected = writable_objects * (cfg.linearize() ? 2 : 1);
 
     prepareFileForWrite();
 
@@ -3165,6 +3183,13 @@ impl::Writer::indicateProgress(bool decrement, bool finished)
                  : next_progress_report == 0
                  ? 0
                  : std::min(99, 1 + ((100 * events_seen) / events_expected)));
+        // PATCH: when linearizing, the analysis phase reports 0..50 ahead of us via the
+        // callback installed in QPDFWriter::registerProgressReporter, so squeeze write-phase
+        // events into 50..100 to keep the bar moving monotonically across the whole pipeline.
+        // Non-linearized writes keep the original 0..100 behaviour.
+        if (cfg.linearize()) {
+            percentage = 50 + percentage / 2;
+        }
         progress_reporter->reportProgress(percentage);
     }
     int increment = std::max(1, (events_expected / 100));
@@ -3177,6 +3202,19 @@ void
 QPDFWriter::registerProgressReporter(std::shared_ptr<ProgressReporter> pr)
 {
     m->progress_reporter = pr;
+    // PATCH: also bridge the linearization-analysis phase into the same reporter.
+    // The analysis loop in QPDF_linearization.cc emits 0..100 already throttled to one event
+    // per integer percent; we map that to 0..50 of the overall progress range and dedupe
+    // post-division so we never invoke the downstream callback twice with the same value.
+    // Write-phase events are scaled to 50..100 in Writer::indicateProgress above.
+    m->qpdf.setLinearizationProgressCallback(
+        [pr, last_reported = -1](int analysis_pct) mutable {
+            int p = analysis_pct / 2;
+            if (p != last_reported) {
+                pr->reportProgress(p);
+                last_reported = p;
+            }
+        });
 }
 
 void
