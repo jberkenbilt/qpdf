@@ -151,19 +151,6 @@ Lin::optimize_internal(
         return;
     }
 
-    // PATCH: hoisted out of calculateLinearizationData. Vanilla qpdf built this
-    // set locally inside the categorisation pass and consulted it while iterating
-    // each object's user set. Because we now collapse the per-object user set into
-    // ObjUserStats at INSERTION time (see addUserToStats below), we need this
-    // information available throughout the page-traversal loop, not just at the
-    // end. Same five keys as the original.
-    open_document_keys_.clear();
-    open_document_keys_.insert("/ViewerPreferences");
-    open_document_keys_.insert("/PageMode");
-    open_document_keys_.insert("/Threads");
-    open_document_keys_.insert("/OpenAction");
-    open_document_keys_.insert("/AcroForm");
-
     // The PDF specification indicates that /Outlines is supposed to be an indirect reference. Force
     // it to be so if it exists and is direct.  (This has been seen in the wild.)
     QPDFObjectHandle root = qpdf.getRoot();
@@ -228,7 +215,7 @@ Lin::optimize_internal(
     obj_user_to_objects_[root_ou].push_back(root_og);
     // PATCH (2): merge this user into the object's stats record instead of
     // .insert into a set<ObjUser>.
-    addUserToStats(object_to_obj_users_[root_og], root_ou);
+    object_to_obj_users_[root_og].add(root_ou);
 
     // PATCH (1): With vector-of-QPDFObjGen replacing set-of-QPDFObjGen we lose
     // the inherent sorted iteration order. Downstream consumers (calculateLinearizationData
@@ -253,32 +240,33 @@ Lin::optimize_internal(
 // calculateLinearizationData — that pass is now a straight read of the
 // already-classified flags.
 void
-Lin::addUserToStats(ObjUserStats& stats, ObjUser const& ou)
+Lin::ObjUserStats::add(ObjUser const& ou)
 {
     switch (ou.ou_type) {
     case ObjUser::ou_page:
-        stats.add_page(static_cast<int>(ou.pageno));
+        add_page(static_cast<int>(ou.pageno));
         break;
     case ObjUser::ou_thumb:
-        stats.add_thumb(static_cast<int>(ou.pageno));
+        add_thumb(static_cast<int>(ou.pageno));
         break;
     case ObjUser::ou_root:
-        stats.is_root = true;
+        is_root = true;
         break;
     case ObjUser::ou_root_key:
-        if (open_document_keys_.contains(ou.key)) {
-            stats.in_open_document = true;
+        if (ou.key == "/ViewerPreferences" || ou.key == "/PageMode" || ou.key == "/Threads" ||
+            ou.key == "/OpenAction" || ou.key == "/AcroForm") {
+            in_open_document = true;
         } else if (ou.key == "/Outlines") {
-            stats.in_outlines = true;
+            in_outlines = true;
         } else {
-            stats.in_others = true;
+            in_others = true;
         }
         break;
     case ObjUser::ou_trailer_key:
         if (ou.key == "/Encrypt") {
-            stats.in_open_document = true;
+            in_open_document = true;
         } else {
-            stats.in_others = true;
+            in_others = true;
         }
         break;
     }
@@ -333,8 +321,12 @@ Lin::updateObjectMaps(
             //     fixed-size ObjUserStats slot. operator[] default-constructs
             //     a zero-initialised ObjUserStats if og is new to the map,
             //     which is the correct identity element for the merge.
-            obj_user_to_objects_[cur.ou].push_back(og);
-            addUserToStats(object_to_obj_users_[og], cur.ou);
+            if (cur.ou.ou_type == ObjUser::ou_page || cur.ou.ou_type == ObjUser::ou_thumb ||
+                (cur.ou.ou_type == ObjUser::ou_root_key &&
+                 (cur.ou.key == "/Pages" || cur.ou.key == "/Outlines"))) {
+                obj_user_to_objects_[cur.ou].push_back(og);
+            }
+            object_to_obj_users_[og].add(cur.ou);
         }
 
         if (cur.oh.isArray()) {
@@ -489,6 +481,14 @@ Lin::filterCompressedObjects(QPDFWriter::ObjTable const& obj)
     //   * The data source is QPDFWriter::ObjTable (the writer's per-object state)
     //     instead of a plain int->int map. Per-og translation goes through
     //     obj[og].object_stream rather than a map lookup.
+
+    // The following comment is incorrect. The ObjTable will be populated with the result of the
+    // linearization step, and all objects returned in the parts vectors will be written. At this
+    // point the table contains empty slots for objects that we reasonably expect to write plus
+    // all compressed objects. If we find objects during linearization with unexpected object ids,
+    // they will be added later. (contains only tells us that there is a valid slot that can be
+    // queried)
+
     //   * Ogs that aren't present in the writer's ObjTable at all are dropped
     //     entirely (the writer doesn't intend to emit them). In the source
     //     vector this means compacting the live entries with an out-pointer
@@ -497,16 +497,11 @@ Lin::filterCompressedObjects(QPDFWriter::ObjTable const& obj)
 
     // Change (3): rewrite obj_user_to_objects_ vectors in place, compact-then-sort+unique.
     for (auto& [ou, ogs]: obj_user_to_objects_) {
-        size_t out = 0;
         for (auto& og: ogs) {
-            if (!obj.contains(og)) {
-                continue; // drop ogs not present in the writer's ObjTable
+            if (auto i2 = obj.contains(og) ? obj[og].object_stream : 0) {
+                og = QPDFObjGen(i2, 0);
             }
-            auto i2 = obj[og].object_stream;
-            QPDFObjGen new_og = (i2 <= 0) ? og : QPDFObjGen(i2, 0);
-            ogs[out++] = new_og;
         }
-        ogs.resize(out);
         std::sort(ogs.begin(), ogs.end());
         ogs.erase(std::unique(ogs.begin(), ogs.end()), ogs.end());
     }
@@ -514,10 +509,8 @@ Lin::filterCompressedObjects(QPDFWriter::ObjTable const& obj)
     // Change (4): collect (from, to) translations + the drop-list in one read-only
     // pass over the map, then apply them.
     std::vector<std::pair<QPDFObjGen, QPDFObjGen>> moves; // (from, to)
-    std::vector<QPDFObjGen> to_drop;
     for (auto const& [og, _]: object_to_obj_users_) {
         if (!obj.contains(og)) {
-            to_drop.push_back(og);
             continue;
         }
         auto i2 = obj[og].object_stream;
@@ -527,9 +520,6 @@ Lin::filterCompressedObjects(QPDFWriter::ObjTable const& obj)
                 moves.emplace_back(og, target);
             }
         }
-    }
-    for (auto const& og: to_drop) {
-        object_to_obj_users_.erase(og);
     }
     for (auto const& [from, to]: moves) {
         auto it = object_to_obj_users_.find(from);

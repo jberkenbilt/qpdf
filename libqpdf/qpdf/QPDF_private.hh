@@ -670,6 +670,8 @@ class QPDF::Doc::Linearization: Common
         bool top;
     };
 
+    // Place ObjUserStats here with the other private structs
+
     // PDF 1.4: Table F.4
     struct HPageOffsetEntry
     {
@@ -857,7 +859,6 @@ class QPDF::Doc::Linearization: Common
     // it's called both from updateObjectMaps (every indirect object reached by DFS) and
     // from optimize_internal (the explicit /Root registration after page traversal).
     struct ObjUserStats;
-    void addUserToStats(ObjUserStats& stats, ObjUser const& ou);
 
     // ===================================================================================
     //
@@ -913,6 +914,24 @@ class QPDF::Doc::Linearization: Common
     // ===================================================================================
     struct ObjUserStats
     {
+        /// @brief Record that an ObjUser references this object.
+        ///
+        /// Updates the internal statistics bits and counters that summarize  categories of users
+        /// reference the object. This includes marking whether the object is referenced from the
+        /// first page, outlines, the document root, open-document keys, other document-level keys,
+        /// thumbnail users, and tracking the first seen non-zero page/thumb and whether more than
+        /// one such page/thumb has been observed.
+        ///
+        /// This method is the single ingest path used by updateObjectMaps and optimize_internal to
+        /// record that `ou` references the object.
+        ///
+        /// @param ou  The ObjUser indicating the user and context that referenced the object.
+        void add(ObjUser const& ou);
+
+        // Given that the struct has non-trivial methods, data members should have a trailing
+        // underscore and be private, and only to the extent that external access is required, have
+        // inlined accessors (eg bool in_first_page() const or void in_first_page(bool) ).
+
         // Set true if ou_page with pageno == 0 ever references the object.
         bool in_first_page{false};
         // Set true if ou_root_key with key == "/Outlines" ever references the object.
@@ -947,10 +966,11 @@ class QPDF::Doc::Linearization: Common
         // bit); since `is_shared` is used purely as a boolean predicate in the
         // surviving consumer and the "shared" categorisation already triggers on
         // any count >= 2, this collapse is observationally equivalent.
-        bool is_shared() const
+        bool
+        is_shared() const
         {
-            int count = (in_first_page ? 1 : 0) + (is_root ? 1 : 0) + (in_outlines ? 1 : 0)
-                + (in_open_document ? 1 : 0) + (in_others ? 1 : 0);
+            int count = (in_first_page ? 1 : 0) + (is_root ? 1 : 0) + (in_outlines ? 1 : 0) +
+                (in_open_document ? 1 : 0) + (in_others ? 1 : 0);
             if (first_other_pageno != -1) {
                 count += more_than_one_other_page ? 2 : 1;
             }
@@ -963,7 +983,8 @@ class QPDF::Doc::Linearization: Common
         // Record that ou_page with this pageno referenced the object.
         // Page 0 is tracked as its own boolean (the linearization spec singles
         // out the first page).
-        void add_page(int pageno)
+        void
+        add_page(int pageno)
         {
             if (pageno == 0) {
                 in_first_page = true;
@@ -976,8 +997,11 @@ class QPDF::Doc::Linearization: Common
             }
         }
 
+        //  Methods that don't need to be called from outside the struct should be private.
+
         // Same scheme for thumbnail user references.
-        void add_thumb(int pageno)
+        void
+        add_thumb(int pageno)
         {
             if (first_thumb_pageno == -1) {
                 first_thumb_pageno = pageno;
@@ -990,7 +1014,8 @@ class QPDF::Doc::Linearization: Common
         // filterCompressedObjects when multiple original objects collapse onto
         // a single containing-object-stream key: their stats have to be merged
         // before the originals are dropped.
-        void merge_from(ObjUserStats const& o)
+        void
+        merge_from(ObjUserStats const& o)
         {
             in_first_page = in_first_page || o.in_first_page;
             in_outlines = in_outlines || o.in_outlines;
@@ -1020,12 +1045,6 @@ class QPDF::Doc::Linearization: Common
     // CHANGE (2): per-object user list, std::set<ObjUser> -> ObjUserStats. See the
     // long comment block above for the rationale and correctness argument.
     std::map<QPDFObjGen, ObjUserStats> object_to_obj_users_;
-
-    // Hoisted out of calculateLinearizationData so addUserToStats can recognise
-    // open-document root-keys at insertion time (where vanilla qpdf had a local
-    // std::set built up only when it reached the categorisation pass). Populated
-    // once at the top of optimize_internal.
-    std::set<std::string> open_document_keys_;
 
     // Linearization data
     bool linearization_warnings_{false}; // set by linearizationWarning, used by checkLinearization
